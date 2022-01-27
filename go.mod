@@ -7,4 +7,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.0.1 // indirect
 	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 	github.com/urfave/cli/v2 v2.3.0 // indirect
+	internal/bea v0.0.0-00010101000000-000000000000 // indirect
 )
+
+replace internal/bea => ./internal/bea

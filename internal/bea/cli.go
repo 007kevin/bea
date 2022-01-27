@@ -1,13 +1,10 @@
-package main
+package bea
 
 import (
-	"log"
-	"os"
-
 	"github.com/urfave/cli/v2"
 )
 
-func main() {
+func Run(args []string) error {
 	app := &cli.App{
 		Name:    "bea",
 		Version: "0.1",
@@ -19,14 +16,10 @@ func main() {
 				Usage: `Generates Eclipse artifacts (i.e .project / .classpath) for a
                 Bazel workspace to work with Eclipse IDEs (including the language server).`,
 				Action: func(c *cli.Context) error {
-					return nil
+					return generate()
 				},
 			},
 		},
 	}
-
-	err := app.Run(os.Args)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return app.Run(args)
 }

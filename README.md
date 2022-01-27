@@ -5,4 +5,4 @@ Generates Eclipse artifacts (i.e .project / .classpath) for a Bazel workspace to
 ## Resources
 
 - Standard Golang Project Layout Guidels
-: https://github.com/golang-standards/project-layout
+  https://github.com/golang-standards/project-layout
