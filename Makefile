@@ -3,7 +3,7 @@
 all: build
 
 build:
-	go build -o output/bea cmd/main.go
+	go build -o output/bin/bea cmd/main.go
 
 run:
-	./output/main
+	./output/bin/bea

@@ -1,8 +1,15 @@
 package bea
 
-import "fmt"
+import (
+	"adaptor"
+	"fmt"
+)
 
 func generate() error {
-	fmt.Println("Hello there")
+	adaptor, err := adaptor.Get()
+	if err != nil {
+		return err
+	}
+	fmt.Println(adaptor.Applicable())
 	return nil
 }
