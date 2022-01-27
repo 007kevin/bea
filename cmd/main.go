@@ -1,7 +1,7 @@
 package main
 
 import (
-	"internal/bea"
+	"bea"
 	"log"
 	"os"
 )
