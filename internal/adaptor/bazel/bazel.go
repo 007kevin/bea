@@ -18,6 +18,10 @@ func (ba Adaptor) Identifier() string {
 	return "Bazel Build Adaptor"
 }
 
+func (ba Adaptor) Run() error {
+	return nil
+}
+
 func dirHas(dir, marker string) (bool, error) {
 	if _, err := os.Stat(marker); err == nil {
 		return true, nil

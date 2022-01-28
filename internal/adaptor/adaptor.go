@@ -8,6 +8,7 @@ import (
 type Adaptor interface {
 	Identifier() string
 	Applicable() (bool, error)
+	Run() error
 }
 
 var Adaptors = []Adaptor{

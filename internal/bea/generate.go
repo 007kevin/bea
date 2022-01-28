@@ -11,6 +11,6 @@ func Generate() error {
 	if err != nil {
 		return err
 	}
-	pterm.Info.Println("Using " + adaptor.Identifier())
-	return nil
+	pterm.Info.Println("Running " + adaptor.Identifier())
+	return adaptor.Run()
 }
