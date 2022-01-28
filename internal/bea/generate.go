@@ -1,9 +1,9 @@
 package bea
 
 import (
-	"fmt"
+	"internal/adaptor"
 
-	"github.com/007kevin/bea/internal/adaptor"
+	"github.com/pterm/pterm"
 )
 
 func Generate() error {
@@ -11,6 +11,6 @@ func Generate() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(adaptor.Applicable())
+	pterm.Info.Println("Using " + adaptor.Identifier())
 	return nil
 }

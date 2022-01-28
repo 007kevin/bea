@@ -1,15 +1,15 @@
 package main
 
 import (
-	"log"
+	"internal/cli"
 	"os"
 
-	"github.com/007kevin/bea/internal/cli"
+	"github.com/pterm/pterm"
 )
 
 func main() {
 	err := cli.Run(os.Args)
 	if err != nil {
-		log.Fatal(err)
+		pterm.Error.Println(err)
 	}
 }

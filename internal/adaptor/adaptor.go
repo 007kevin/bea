@@ -2,12 +2,12 @@ package adaptor
 
 import (
 	"errors"
-
-	"github.com/007kevin/bea/internal/adaptor/bazel"
+	"internal/adaptor/bazel"
 )
 
 type Adaptor interface {
-	Applicable() bool
+	Identifier() string
+	Applicable() (bool, error)
 }
 
 var Adaptors = []Adaptor{
@@ -16,9 +16,11 @@ var Adaptors = []Adaptor{
 
 func Get() (Adaptor, error) {
 	for _, adaptor := range Adaptors {
-		if adaptor.Applicable() {
-			return adaptor, nil
+		if yes, err := adaptor.Applicable(); yes && err == nil {
+			return adaptor, err
+		} else if err != nil {
+			return nil, err
 		}
 	}
-	return nil, errors.New("No suitable adaptor found")
+	return nil, errors.New("No suitable build adaptor found. Are you in a project directory?")
 }
