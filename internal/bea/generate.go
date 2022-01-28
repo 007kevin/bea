@@ -1,11 +1,12 @@
 package bea
 
 import (
-	"adaptor"
 	"fmt"
+
+	"github.com/007kevin/bea/internal/adaptor"
 )
 
-func generate() error {
+func Generate() error {
 	adaptor, err := adaptor.Get()
 	if err != nil {
 		return err

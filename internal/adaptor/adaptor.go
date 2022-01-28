@@ -1,8 +1,9 @@
 package adaptor
 
 import (
-	"bazel"
 	"errors"
+
+	"github.com/007kevin/bea/internal/adaptor/bazel"
 )
 
 type Adaptor interface {
