@@ -1,7 +1,10 @@
 package bazel
 
 import (
+	"encoding/xml"
 	"errors"
+	"fmt"
+	"internal/eclipse"
 	"os"
 )
 
@@ -19,6 +22,14 @@ func (ba Adaptor) Identifier() string {
 }
 
 func (ba Adaptor) Run() error {
+	fmt.Print(xml.Header)
+	out, _ := xml.MarshalIndent(&eclipse.Classpath{
+		Entries: []*eclipse.ClasspathEntry{
+			&eclipse.DefaultConEntry,
+			&eclipse.ClasspathEntry{},
+		},
+	}, "", "    ")
+	fmt.Println(string(out))
 	return nil
 }
 
