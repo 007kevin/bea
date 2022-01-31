@@ -24,7 +24,7 @@ var DefaultConEntry = ClasspathEntry{
 	Kind: "con",
 	Path: "org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-11",
 	Attributes: []*Attribute{
-		&Attribute{Name: "module", Value: "true"},
+		{Name: "module", Value: "true"},
 	},
 }
 
