@@ -5,15 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"internal/eclipse"
-	"log"
 	"os"
 	"os/exec"
+	"path"
 	"strings"
 
+	"github.com/ojizero/gofindup"
 	"github.com/pterm/pterm"
 )
 
 const FILE_MARKER = "BUILD"
+const WORKSPACE_MARKER = "WORKSPACE"
 
 type Adaptor struct {
 }
@@ -22,11 +24,11 @@ func (ba *Adaptor) Applicable() (bool, error) {
 	return dirHas(FILE_MARKER)
 }
 
-func (ba Adaptor) Identifier() string {
+func (ba *Adaptor) Identifier() string {
 	return "Bazel Build Adaptor"
 }
 
-func (ba Adaptor) Run() error {
+func (ba *Adaptor) Run() error {
 	fmt.Print(xml.Header)
 	out, _ := xml.MarshalIndent(&eclipse.Classpath{
 		Entries: []*eclipse.ClasspathEntry{
@@ -36,16 +38,16 @@ func (ba Adaptor) Run() error {
 		},
 	}, "", "    ")
 	fmt.Println(string(out))
-	output, err := bazelQuery("java_proto_library")
-	if err != nil {
-		return err
-	}
-	lines := splitLines(output)
-	for _, v := range lines {
-		fmt.Println(v)
+	fmt.Println(findWorkspaceRoot())
+	return buildProtos()
+}
 
+func findWorkspaceRoot() (string, error) {
+	p, err := gofindup.Findup(WORKSPACE_MARKER)
+	if err != nil {
+		return "", err
 	}
-	return nil
+	return path.Dir(p), nil
 }
 
 func dirHas(marker string) (bool, error) {
@@ -59,14 +61,27 @@ func dirHas(marker string) (bool, error) {
 }
 
 func bazelQuery(filter string) (string, error) {
-	return runCommand("bazel", "query", "kind("+filter+",//...)")
+	return runCommand("bazel", "query", "kind("+filter+",...)")
+}
+
+func buildProtos() error {
+	output, err := bazelQuery("java_proto_library")
+	if err != nil {
+		return err
+	}
+	lines := splitLines(output)
+	args := append([]string{"bazel", "build", "--nobuild"}, lines...)
+	_, err = runCommand(args...)
+	pterm.Info.Println("HERE")
+	pterm.Info.Println(err)
+	return err
 }
 
 func runCommand(args ...string) (string, error) {
 	pterm.Info.Printf("Executing command: %v\n", args)
 	out, err := exec.Command(args[0], args[1:]...).Output()
 	if err != nil {
-		log.Fatal(err)
+		pterm.Error.Println(err)
 		return "", err
 	}
 	return string(out), nil
