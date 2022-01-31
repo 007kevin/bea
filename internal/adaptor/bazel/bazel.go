@@ -1,10 +1,12 @@
 package bazel
 
 import (
+	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"internal/eclipse"
+	"io"
 	"os"
 	"os/exec"
 	"path"
@@ -39,7 +41,9 @@ func (ba *Adaptor) Run() error {
 	}, "", "    ")
 	fmt.Println(string(out))
 	fmt.Println(findWorkspaceRoot())
-	return buildProtos()
+	buildProtos()
+	bazelAQuery("Javac", "--output", "proto_library")
+	return nil
 }
 
 func findWorkspaceRoot() (string, error) {
@@ -64,29 +68,59 @@ func bazelQuery(filter string) (string, error) {
 	return runCommand("bazel", "query", "kind("+filter+",...)")
 }
 
+func bazelAQuery(mnemonic string, filter string, kinds ...string) (string, error) {
+	var kindUnion []string
+	for _, kind := range kinds {
+		kindUnion = append(kindUnion, "kind("+kind+", ...)")
+	}
+	output, err := runCommand(
+		"bazel",
+		"aquery",
+		"--include_aspects",
+		"mnemonic("+mnemonic+", "+strings.Join(kindUnion, "union")+")",
+	)
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
 func buildProtos() error {
+	pterm.Info.Println("Building java protos")
 	output, err := bazelQuery("java_proto_library")
 	if err != nil {
 		return err
 	}
 	lines := splitLines(output)
+	if len(lines) == 0 {
+		pterm.Info.Println("No protos found. Skipping.")
+		return nil
+	}
 	args := append([]string{"bazel", "build", "--nobuild"}, lines...)
 	_, err = runCommand(args...)
-	pterm.Info.Println("HERE")
-	pterm.Info.Println(err)
 	return err
 }
 
 func runCommand(args ...string) (string, error) {
 	pterm.Info.Printf("Executing command: %v\n", args)
-	out, err := exec.Command(args[0], args[1:]...).Output()
-	if err != nil {
+	var cmd = exec.Command(args[0], args[1:]...)
+	var stdBuffer bytes.Buffer
+	cmd.Stdout = io.MultiWriter(os.Stdout, &stdBuffer) // write output to also terminal so user can see.
+	cmd.Stderr = os.Stdout
+	if err := cmd.Run(); err != nil {
 		pterm.Error.Println(err)
 		return "", err
 	}
-	return string(out), nil
+	return stdBuffer.String(), nil
 }
 
-func splitLines(str string) []string {
-	return strings.Split(str, "\n")
+func splitLines(input string) []string {
+	var output []string
+	for _, str := range strings.Split(input, "\n") {
+		str = strings.TrimSpace(str)
+		if str != "" {
+			output = append(output, str)
+		}
+	}
+	return output
 }
