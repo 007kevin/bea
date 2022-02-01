@@ -4,5 +4,8 @@
 # https://developers.google.com/protocol-buffers/docs/reference/go-generated
 # > go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 
-protoc -I=third_party/bazel/protobuf -I. --go_out=third_party/bazel/golang third_party/bazel/protobuf/build.proto
-protoc -I=third_party/bazel/protobuf -I. --go_out=third_party/bazel/golang third_party/bazel/protobuf/analysis_v2.proto
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd $DIR/..
+
+protoc -I=third_party/bazel/protobuf -I. --go_out=. third_party/bazel/protobuf/build.proto
+protoc -I=third_party/bazel/protobuf -I. --go_out=. third_party/bazel/protobuf/analysis_v2.proto
