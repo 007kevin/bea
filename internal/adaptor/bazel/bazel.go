@@ -76,7 +76,9 @@ func bazelAQuery(mnemonic string, filter string, kinds ...string) (string, error
 	output, err := runCommand(
 		"bazel",
 		"aquery",
+		"--output=proto",
 		"--include_aspects",
+		"--allow_analysis_failures",
 		"mnemonic("+mnemonic+", "+strings.Join(kindUnion, "union")+")",
 	)
 	if err != nil {
