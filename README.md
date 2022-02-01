@@ -15,3 +15,4 @@ Generates Eclipse artifacts (i.e .project / .classpath) for a Bazel workspace to
 - Executing command and writing to file:
   https://yourbasic.org/golang/temporary-file-directory/
   https://stackoverflow.com/questions/18986943/in-golang-how-can-i-write-the-stdout-of-an-exec-cmd-to-a-file
+- Investigation: https://www.diffchecker.com/fhrsdsLR

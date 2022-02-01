@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"third_party/bazel/analysis"
 
@@ -49,7 +48,6 @@ func (ba *Adaptor) Run() error {
 	buildProtos()
 	bazelProtoAQuery("Javac", "--output", "proto_library")
 	bazelProtoAQuery("Javac", "--classpath", "java_library", "java_test", "java_binary")
-	bazelProtoAQuery("JavaSourceJar", "--sources", "java_library", "java_test", "java_binary")
 	return nil
 }
 
@@ -102,7 +100,7 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (string, 
 
 func bazelParseProto(input *bytes.Buffer) (*analysis.ActionGraphContainer, error) {
 	aqueryResult := &analysis.ActionGraphContainer{}
-	err := proto.UnmarshalOptions{}.Unmarshal(input.Bytes(), aqueryResult)
+	err := proto.Unmarshal(input.Bytes(), aqueryResult)
 	if err != nil {
 		pterm.Error.Println(err)
 		return nil, err
@@ -138,30 +136,29 @@ func bazelReadDependencies(aqueryResult *analysis.ActionGraphContainer, argFilte
 	for _, artifact := range aqueryResult.Artifacts {
 		var pathFragment = pathFragments[artifact.Id]
 		if pathFragment != nil {
-			var artifactPath, err = expandPathFragment(artifact.Id, pathFragments)
-			pterm.Info.Println(artifactPath)
+			var relative, err = expandPathFragment(pathFragment, pathFragments)
 			if err != nil {
-				pterm.Error.Println(err)
+				continue
 			}
-			if !argPaths.Contains(artifactPath) {
-				pterm.Warning.Println("...artifact was not specified by --filterArgument: '" + artifactPath + "'")
+			if !argPaths.Contains(relative) {
+				// pterm.Warning.Println("...artifact was not specified by --filterArgument: '" + relative + "'")
 				continue
 			}
 			if outputIds.Contains(artifact.Id) && argFilter != "--output" {
-				pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
+				// pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
 				continue
 			}
-			pterm.Info.Println("...found bazel dependency " + artifactPath)
-			artifactPaths = append(artifactPaths, artifactPath)
+			pterm.Info.Println("...found bazel dependency " + relative)
+			artifactPaths = append(artifactPaths, relative)
 		}
 	}
 
 	return artifactPaths
 }
 
-func expandPathFragment(id uint32, pathFragments map[uint32]*analysis.PathFragment) (string, error) {
+func expandPathFragment(pathFragment *analysis.PathFragment, pathFragments map[uint32]*analysis.PathFragment) (string, error) {
 	labels := []string{}
-	currId := id
+	currId := pathFragment.Id
 	// Only positive IDs are valid for path fragments. An ID of zero indicates a terminal node.
 	for currId > 0 {
 		currFragment, ok := pathFragments[currId]
