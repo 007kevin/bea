@@ -46,7 +46,6 @@ func (ba *Adaptor) Run() error {
 	fmt.Println(string(out))
 	fmt.Println(findWorkspaceRoot())
 	buildProtos()
-	bazelProtoAQuery("Javac", "--output", "proto_library")
 	bazelProtoAQuery("Javac", "--classpath", "java_library", "java_test", "java_binary")
 	return nil
 }
@@ -74,7 +73,7 @@ func bazelQuery(filter string) (string, error) {
 	return output.String(), err
 }
 
-func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (string, error) {
+func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) ([]string, error) {
 	var kindUnion []string
 	for _, kind := range kinds {
 		kindUnion = append(kindUnion, "kind("+kind+", ...)")
@@ -88,14 +87,13 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (string, 
 		"mnemonic("+mnemonic+", "+strings.Join(kindUnion, " union ")+")",
 	)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	aqueryResult, err := bazelParseProto(output)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	bazelReadDependencies(aqueryResult, filter)
-	return output.String(), nil
+	return bazelReadDependencies(aqueryResult, filter), nil
 }
 
 func bazelParseProto(input *bytes.Buffer) (*analysis.ActionGraphContainer, error) {
@@ -134,7 +132,7 @@ func bazelReadDependencies(aqueryResult *analysis.ActionGraphContainer, argFilte
 		pathFragments[pathFragent.Id] = pathFragent
 	}
 	for _, artifact := range aqueryResult.Artifacts {
-		var pathFragment = pathFragments[artifact.Id]
+		var pathFragment = pathFragments[artifact.PathFragmentId]
 		if pathFragment != nil {
 			var relative, err = expandPathFragment(pathFragment, pathFragments)
 			if err != nil {
@@ -148,7 +146,7 @@ func bazelReadDependencies(aqueryResult *analysis.ActionGraphContainer, argFilte
 				// pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
 				continue
 			}
-			pterm.Info.Println("...found bazel dependency " + relative)
+			fmt.Printf("INFO: found bazel dependency [%s]\n", relative)
 			artifactPaths = append(artifactPaths, relative)
 		}
 	}
@@ -184,6 +182,7 @@ func buildProtos() error {
 	}
 	args := append([]string{"bazel", "build", "--nobuild"}, lines...)
 	_, err = CommandExec{}.runCommand(args...)
+	bazelProtoAQuery("Javac", "--output", "proto_library")
 	return err
 }
 
