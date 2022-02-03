@@ -8,4 +8,5 @@ DIR="$(cd "$(dirname "$0")" && pwd)"
 cd $DIR/..
 
 protoc -I=third_party/bazel/protobuf -I. --go_out=. third_party/bazel/protobuf/build.proto
+protoc -I=third_party/bazel/protobuf -I. --go_out=. third_party/bazel/protobuf/analysis.proto
 protoc -I=third_party/bazel/protobuf -I. --go_out=. third_party/bazel/protobuf/analysis_v2.proto

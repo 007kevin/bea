@@ -4,7 +4,7 @@ Generates Eclipse artifacts (i.e .project / .classpath) for a Bazel workspace to
 
 ## Resources
 
-- Standard Golang Project Layout Guidels
+- Standard Golang Project Layout Guide
   https://github.com/golang-standards/project-layout
 - Go Playgound struct->xml example
   https://stackoverflow.com/questions/61603334/trying-to-use-golang-encoding-xml-to-encode-a-struct-to-xml-a-structure-with-an
@@ -16,3 +16,10 @@ Generates Eclipse artifacts (i.e .project / .classpath) for a Bazel workspace to
   https://yourbasic.org/golang/temporary-file-directory/
   https://stackoverflow.com/questions/18986943/in-golang-how-can-i-write-the-stdout-of-an-exec-cmd-to-a-file
 - Investigation: https://www.diffchecker.com/fhrsdsLR
+
+## TODO
+
+- Newer bazel versions require analysis_v2.proto whereas old versions require analysis.proto. See:
+  https://github.com/bazelbuild/bazel/blob/master/src/main/protobuf/analysis_v2.proto
+  https://github.com/bazelbuild/bazel/blob/43bcbb623e241e6381149c08e2be653433cc9407/src/main/protobuf/analysis.proto
+  Need to determine which bazel versions correspond to the different protos.

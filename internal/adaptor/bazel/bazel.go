@@ -10,11 +10,12 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"third_party/bazel/analysis"
+	"third_party/bazel/analysis_v2"
 
-	"github.com/liyue201/gostl/ds/set"
 	"github.com/ojizero/gofindup"
 	"github.com/pterm/pterm"
 	"google.golang.org/protobuf/proto"
@@ -22,6 +23,47 @@ import (
 
 const FILE_MARKER = "BUILD"
 const WORKSPACE_MARKER = "WORKSPACE"
+
+var bazelVersion *Version
+
+func init() {
+	output, err := CommandExec{}.runCommand("bazel", "--version")
+	if err != nil {
+		pterm.Fatal.Println(err)
+	}
+	bazelVersion, err = parseVersion(output.String())
+	if err != nil {
+		pterm.Fatal.Println(err)
+	}
+}
+
+type Version struct {
+	numeric []int
+}
+
+func (version *Version) useV2() bool {
+	if len(version.numeric) == 0 {
+		pterm.Warning.Println("Version not found. Defaulting to V2")
+		return true
+	}
+	return version.numeric[0] >= 5 // Just need to check the major version.
+}
+
+func parseVersion(raw string) (*Version, error) {
+	r, err := regexp.Compile("[0-9.]+")
+	if err != nil {
+		return nil, err
+	}
+	numeric := make([]int, 0)
+	for _, value := range strings.Split(r.FindString(raw), ".") {
+		number, err := strconv.Atoi(value)
+		if err != nil {
+			return nil, err
+		}
+		numeric = append(numeric, number)
+	}
+	return &Version{numeric: numeric}, nil
+}
 
 type Adaptor struct {
 }
@@ -47,6 +89,8 @@ func (ba *Adaptor) Run() error {
 	fmt.Println(findWorkspaceRoot())
 	buildProtos()
 	bazelProtoAQuery("Javac", "--classpath", "java_library", "java_test", "java_binary")
+	// bazelProtoAQuery("Javac", "--source_jars", "proto_library")
+	// bazelProtoAQuery("JavaSourceJar", "--sources", "java_library", "java_test", "java_binary")
 	return nil
 }
 
@@ -93,80 +137,25 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) ([]string
 	if err != nil {
 		return nil, err
 	}
-	return bazelReadDependencies(aqueryResult, filter), nil
+	return aqueryResult.JavaDependencies()
 }
 
-func bazelParseProto(input *bytes.Buffer) (*analysis.ActionGraphContainer, error) {
-	aqueryResult := &analysis.ActionGraphContainer{}
-	err := proto.Unmarshal(input.Bytes(), aqueryResult)
+func bazelParseProto(input *bytes.Buffer) (AQueryResult, error) {
+	aQuery := newAQueryResult()
+	err := proto.Unmarshal(input.Bytes(), aQuery.Result())
 	if err != nil {
 		pterm.Error.Println(err)
 		return nil, err
 	}
-	return aqueryResult, nil
+	return aQuery, nil
 }
 
-func bazelReadDependencies(aqueryResult *analysis.ActionGraphContainer, argFilter string) []string {
-	var argPaths = set.New()
-	var outputIds = set.New()
-	for _, action := range aqueryResult.Actions {
-		var isArgFilter = false
-		for _, argument := range action.Arguments {
-			if isArgFilter && strings.HasPrefix(argument, "-") {
-				isArgFilter = false
-				continue
-			}
-			if !isArgFilter {
-				isArgFilter = argument == argFilter
-				continue
-			}
-			argPaths.Insert(argument)
-		}
-		for _, outputId := range action.OutputIds {
-			outputIds.Insert(outputId)
-		}
+func newAQueryResult() AQueryResult {
+	if bazelVersion.useV2() {
+		return &AnalysisV2{result: &analysis_v2.ActionGraphContainer{}}
+	} else {
+		return &Analysis{result: &analysis.ActionGraphContainer{}}
 	}
-	var artifactPaths []string
-	pathFragments := map[uint32]*analysis.PathFragment{}
-	for _, pathFragent := range aqueryResult.PathFragments {
-		pathFragments[pathFragent.Id] = pathFragent
-	}
-	for _, artifact := range aqueryResult.Artifacts {
-		var pathFragment = pathFragments[artifact.PathFragmentId]
-		if pathFragment != nil {
-			var relative, err = expandPathFragment(pathFragment, pathFragments)
-			if err != nil {
-				continue
-			}
-			if !argPaths.Contains(relative) {
-				// pterm.Warning.Println("...artifact was not specified by --filterArgument: '" + relative + "'")
-				continue
-			}
-			if outputIds.Contains(artifact.Id) && argFilter != "--output" {
-				// pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
-				continue
-			}
-			fmt.Printf("INFO: found bazel dependency [%s]\n", relative)
-			artifactPaths = append(artifactPaths, relative)
-		}
-	}
-
-	return artifactPaths
-}
-
-func expandPathFragment(pathFragment *analysis.PathFragment, pathFragments map[uint32]*analysis.PathFragment) (string, error) {
-	labels := []string{}
-	currId := pathFragment.Id
-	// Only positive IDs are valid for path fragments. An ID of zero indicates a terminal node.
-	for currId > 0 {
-		currFragment, ok := pathFragments[currId]
-		if !ok {
-			return "", fmt.Errorf("undefined path fragment id %d", currId)
-		}
-		labels = append([]string{currFragment.Label}, labels...)
-		currId = currFragment.ParentId
-	}
-	return filepath.Join(labels...), nil
 }
 
 func buildProtos() error {
