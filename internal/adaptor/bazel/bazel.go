@@ -27,10 +27,11 @@ const WORKSPACE_MARKER = "WORKSPACE"
 var bazelVersion *Version
 
 func init() {
-	output, err := CommandExec{}.runCommand("bazel", "--version")
+	output, err := CommandExec{Suppress: true}.runCommand("bazel", "--version")
 	if err != nil {
 		pterm.Fatal.Println(err)
 	}
+	pterm.Info.Println("Running " + output.String())
 	bazelVersion, err = parseVersion(output.String())
 	if err != nil {
 		pterm.Fatal.Println(err)
@@ -87,11 +88,31 @@ func (ba *Adaptor) Run() error {
 	}, "", "    ")
 	fmt.Println(string(out))
 	fmt.Println(findWorkspaceRoot())
-	buildProtos()
-	bazelProtoAQuery("Javac", "--classpath", "java_library", "java_test", "java_binary")
+	var ss StringSlice
+	ss.append(bazelJavaProtos())
+	ss.append(bazelJavaDeps())
+	if ss.err != nil {
+		return ss.err
+	}
+	for _, dep := range ss.slice {
+		fmt.Println(dep)
+	}
 	// bazelProtoAQuery("Javac", "--source_jars", "proto_library")
 	// bazelProtoAQuery("JavaSourceJar", "--sources", "java_library", "java_test", "java_binary")
 	return nil
+}
+
+type StringSlice struct {
+	err   error
+	slice []string
+}
+
+func (ss *StringSlice) append(slice []string, err error) *StringSlice {
+	if ss.err != nil {
+		return ss
+	}
+	ss.slice = append(ss.slice, slice...)
+	return ss
 }
 
 func findWorkspaceRoot() (string, error) {
@@ -117,7 +138,35 @@ func bazelQuery(filter string) (string, error) {
 	return output.String(), err
 }
 
-func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) ([]string, error) {
+func bazelJavaProtos() ([]string, error) {
+	pterm.Info.Println("Building java protos")
+	output, err := bazelQuery("java_proto_library")
+	if err != nil {
+		return nil, err
+	}
+	lines := splitLines(output)
+	if len(lines) == 0 {
+		pterm.Info.Println("No protos found. Skipping.")
+		return nil, nil
+	}
+	args := append([]string{"bazel", "build", "--nobuild"}, lines...)
+	_, err = CommandExec{}.runCommand(args...)
+	aQueryResult, err := bazelProtoAQuery("Javac", "--output", "proto_library")
+	if err != nil {
+		return nil, err
+	}
+	return aQueryResult.Dependencies()
+}
+
+func bazelJavaDeps() ([]string, error) {
+	aQueryResult, err := bazelProtoAQuery("Javac", "--classpath", "java_library", "java_test", "java_binary")
+	if err != nil {
+		return nil, err
+	}
+	return aQueryResult.Dependencies()
+}
+
+func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (AQueryResult, error) {
 	var kindUnion []string
 	for _, kind := range kinds {
 		kindUnion = append(kindUnion, "kind("+kind+", ...)")
@@ -133,11 +182,7 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) ([]string
 	if err != nil {
 		return nil, err
 	}
-	aqueryResult, err := bazelParseProto(output)
-	if err != nil {
-		return nil, err
-	}
-	return aqueryResult.JavaDependencies()
+	return bazelParseProto(output)
 }
 
 func bazelParseProto(input *bytes.Buffer) (AQueryResult, error) {
@@ -158,30 +203,13 @@ func newAQueryResult() AQueryResult {
 	}
 }
 
-func buildProtos() error {
-	pterm.Info.Println("Building java protos")
-	output, err := bazelQuery("java_proto_library")
-	if err != nil {
-		return err
-	}
-	lines := splitLines(output)
-	if len(lines) == 0 {
-		pterm.Info.Println("No protos found. Skipping.")
-		return nil
-	}
-	args := append([]string{"bazel", "build", "--nobuild"}, lines...)
-	_, err = CommandExec{}.runCommand(args...)
-	bazelProtoAQuery("Javac", "--output", "proto_library")
-	return err
-}
-
 type CommandExec struct {
 	// Suppress stdout when running the command
 	Suppress bool
 }
 
 func (options CommandExec) runCommand(args ...string) (*bytes.Buffer, error) {
-	pterm.Info.Printf("Executing command: %v\n", args)
+	pterm.Info.Printf("%s\n", strings.Join(args, " "))
 	var cmd = exec.Command(args[0], args[1:]...)
 	var buffer = &bytes.Buffer{}
 

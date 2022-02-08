@@ -12,7 +12,7 @@ import (
 )
 
 type AQueryResult interface {
-	JavaDependencies() ([]string, error)
+	Dependencies() ([]string, error)
 	Result() protoreflect.ProtoMessage
 }
 
@@ -24,7 +24,7 @@ func (analysis *AnalysisV2) Result() protoreflect.ProtoMessage {
 	return analysis.result
 }
 
-func (analysis *AnalysisV2) JavaDependencies() ([]string, error) {
+func (analysis *AnalysisV2) Dependencies() ([]string, error) {
 	var argFilter = "--classpath"
 	var argPaths = set.New()
 	var outputIds = set.New()
@@ -65,7 +65,7 @@ func (analysis *AnalysisV2) JavaDependencies() ([]string, error) {
 				// pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
 				continue
 			}
-			fmt.Printf("INFO: found bazel dependency [%s]\n", relative)
+			fmt.Printf("INFO: found dependency: %s\n", relative)
 			artifactPaths = append(artifactPaths, relative)
 		}
 	}
@@ -96,7 +96,7 @@ func (analysis *Analysis) Result() protoreflect.ProtoMessage {
 	return analysis.result
 }
 
-func (analysis *Analysis) JavaDependencies() ([]string, error) {
+func (analysis *Analysis) Dependencies() ([]string, error) {
 	var argFilter = "--classpath"
 	var argPaths = set.New()
 	var outputIds = set.New()
@@ -129,7 +129,7 @@ func (analysis *Analysis) JavaDependencies() ([]string, error) {
 				// pterm.Warning.Println("...artifact is the output of another java action: '" + artifact.Id + "'")
 				continue
 			}
-			fmt.Printf("INFO: found bazel dependency [%s]\n", relative)
+			fmt.Printf("INFO: found dependency: %s\n", relative)
 			artifactPaths = append(artifactPaths, relative)
 		}
 	}
