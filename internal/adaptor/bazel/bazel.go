@@ -1,21 +1,25 @@
 package bazel
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/xml"
 	"errors"
 	"fmt"
 	"internal/eclipse"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"third_party/bazel/analysis"
 	"third_party/bazel/analysis_v2"
 
+	"github.com/liyue201/gostl/ds/set"
 	"github.com/ojizero/gofindup"
 	"github.com/pterm/pterm"
 	"google.golang.org/protobuf/proto"
@@ -51,10 +55,7 @@ func (version *Version) useV2() bool {
 }
 
 func parseVersion(raw string) (*Version, error) {
-	r, err := regexp.Compile("[0-9.]+")
-	if err != nil {
-		return nil, err
-	}
+	r := regexp.MustCompile("[0-9.]+")
 	numeric := make([]int, 0)
 	for _, value := range strings.Split(r.FindString(raw), ".") {
 		number, err := strconv.Atoi(value)
@@ -89,12 +90,21 @@ func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	fmt.Println(string(out))
 	fmt.Println(findWorkspaceRoot())
 	var ss StringSlice
-	ss.append(bazelJavaProtos())
-	ss.append(bazelJavaDeps())
+	// ss.append(bazelJavaProtos())
+	// ss.append(bazelJavaDeps())
 	if ss.err != nil {
 		return nil, nil, ss.err
 	}
-	for _, dep := range ss.slice {
+	srcDirs, tstDirs, err := bazelJavaDirs()
+	if err != nil {
+		return nil, nil, err
+	}
+	fmt.Println("---Source---")
+	for _, dep := range srcDirs {
+		fmt.Println(dep)
+	}
+	fmt.Println("---Test---")
+	for _, dep := range tstDirs {
 		fmt.Println(dep)
 	}
 	return &eclipse.Project{}, &eclipse.Classpath{}, nil
@@ -185,6 +195,101 @@ func bazelJavaDeps() ([]string, error) {
 	}
 	dependencies, err := aQueryResult.Dependencies()
 	return addWorkspaceRoot(dependencies), err
+}
+
+func bazelJavaDirs() ([]string, []string, error) {
+	root, err := findBuildRoot()
+	if err != nil {
+		return nil, nil, err
+	}
+	pterm.Info.Printf("Normalizing all java files in %s. This may take awhile...\n", root)
+	javaFiles := find(root, ".java")
+	var srcDirs []string
+	var tstDirs []string
+	for _, dir := range normalizeDirs(javaFiles) {
+		if isSrcDirectory(dir) {
+			srcDirs = append(srcDirs, dir)
+		} else {
+			tstDirs = append(tstDirs, dir)
+		}
+	}
+	return srcDirs, tstDirs, nil
+}
+
+// Use heuristics to determine whether source or test directory
+func isSrcDirectory(str string) bool {
+	str = strings.ToLower(str)
+	if strings.Contains(str, "src/main/java") {
+		return true
+	}
+	if strings.Contains(str, "src/test/java") {
+		return false
+	}
+	if strings.Contains(str, "source") {
+		return true
+	}
+	if strings.Contains(str, "test") {
+		return false
+	}
+	if strings.Contains(str, "src") {
+		return true
+	}
+	if strings.Contains(str, "tst") {
+		return false
+	}
+	pterm.Warning.Printf("Unable to determine source type for %s. Defaulting to true\n", str)
+	return true
+}
+
+func find(root, ext string) []string {
+	var files []string
+	filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
+		if e != nil {
+			return e
+		}
+		if filepath.Ext(d.Name()) == ext {
+			files = append(files, s)
+		}
+		return nil
+	})
+	return files
+}
+
+func normalizeDirs(javaFiles []string) []string {
+	var dirs = set.New()
+	buildRoot, err := findBuildRoot()
+	if err != nil {
+		pterm.Fatal.Println(err)
+	}
+	for _, file := range javaFiles {
+		dir := filepath.Dir(file)
+		pkg := extractPackage(file)
+		dirs.Insert(strings.TrimPrefix(strings.TrimSuffix(dir, pkg), buildRoot))
+	}
+	var res []string
+	for iter := dirs.Begin(); iter.IsValid(); iter.Next() {
+		res = append(res, fmt.Sprintf("%v", iter.Value()))
+	}
+	return res
+}
+
+func extractPackage(javaFile string) string {
+	file, err := os.Open(javaFile)
+	if err != nil {
+		pterm.Error.Println(err)
+		return ""
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	reg := regexp.MustCompile(`\s*package\s+(\S+);`)
+	for scanner.Scan() {
+		line := scanner.Text()
+		matches := reg.FindStringSubmatch(line)
+		if len(matches) > 1 {
+			return strings.ReplaceAll(matches[1], ".", string(os.PathSeparator))
+		}
+	}
+	return ""
 }
 
 func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (AQueryResult, error) {
