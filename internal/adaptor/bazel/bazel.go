@@ -88,6 +88,17 @@ func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 		},
 	}, "", "    ")
 	fmt.Println(string(out))
+	fmt.Println("--------------")
+	out2, _ := xml.MarshalIndent(&eclipse.Project{
+		Name: "projectxyz",
+		BuildSpec: []*eclipse.BuildCommand{
+			{Name: "org.eclipse.jdt.core.javabuilder"},
+		},
+		Natures: []string{
+			"org.eclipse.jdt.core.javanature",
+		},
+	}, "", "    ")
+	fmt.Println(string(out2))
 	fmt.Println(findWorkspaceRoot())
 	var ss StringSlice
 	ss.append(bazelJavaProtos())
