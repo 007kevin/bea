@@ -90,8 +90,8 @@ func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	fmt.Println(string(out))
 	fmt.Println(findWorkspaceRoot())
 	var ss StringSlice
-	// ss.append(bazelJavaProtos())
-	// ss.append(bazelJavaDeps())
+	ss.append(bazelJavaProtos())
+	ss.append(bazelJavaDeps())
 	if ss.err != nil {
 		return nil, nil, ss.err
 	}

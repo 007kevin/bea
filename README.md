@@ -12,6 +12,7 @@ Generates Eclipse artifacts (i.e .project / .classpath) for a Bazel workspace to
 - Sample eclipse projects for modelling artifacts
   https://github.com/eclipse/eclipse.jdt.ls/tree/master/org.eclipse.jdt.ls.tests/projects/eclipse
   https://github.com/eclipse/eclipse.jdt.ls/blob/master/org.eclipse.jdt.ls.tests/projects/eclipse/reference/.classpath
+  explanation: https://programmer.group/detailed-explanation-of-classpath-file-in-eclipse-project.html
 - Executing command and writing to file:
   https://yourbasic.org/golang/temporary-file-directory/
   https://stackoverflow.com/questions/18986943/in-golang-how-can-i-write-the-stdout-of-an-exec-cmd-to-a-file
