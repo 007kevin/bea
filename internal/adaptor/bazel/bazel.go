@@ -21,7 +21,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const FILE_MARKER = "BUILD"
+const BUILD_MARKER = "BUILD"
 const WORKSPACE_MARKER = "WORKSPACE"
 
 var bazelVersion *Version
@@ -70,14 +70,14 @@ type Adaptor struct {
 }
 
 func (ba *Adaptor) Applicable() (bool, error) {
-	return dirHas(FILE_MARKER)
+	return dirHas(BUILD_MARKER)
 }
 
 func (ba *Adaptor) Identifier() string {
 	return "Bazel Build Adaptor"
 }
 
-func (ba *Adaptor) Run() error {
+func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	fmt.Print(xml.Header)
 	out, _ := xml.MarshalIndent(&eclipse.Classpath{
 		Entries: []*eclipse.ClasspathEntry{
@@ -92,14 +92,12 @@ func (ba *Adaptor) Run() error {
 	ss.append(bazelJavaProtos())
 	ss.append(bazelJavaDeps())
 	if ss.err != nil {
-		return ss.err
+		return nil, nil, ss.err
 	}
 	for _, dep := range ss.slice {
 		fmt.Println(dep)
 	}
-	// bazelProtoAQuery("Javac", "--source_jars", "proto_library")
-	// bazelProtoAQuery("JavaSourceJar", "--sources", "java_library", "java_test", "java_binary")
-	return nil
+	return &eclipse.Project{}, &eclipse.Classpath{}, nil
 }
 
 type StringSlice struct {
@@ -123,6 +121,14 @@ func findWorkspaceRoot() (string, error) {
 	return path.Dir(p), nil
 }
 
+func findBuildRoot() (string, error) {
+	p, err := gofindup.Findup(BUILD_MARKER)
+	if err != nil {
+		return "", err
+	}
+	return path.Dir(p), nil
+}
+
 func dirHas(marker string) (bool, error) {
 	if _, err := os.Stat(marker); err == nil {
 		return true, nil
@@ -131,6 +137,19 @@ func dirHas(marker string) (bool, error) {
 	} else {
 		return false, err
 	}
+}
+
+func addWorkspaceRoot(dependencies []string) []string {
+	root, err := findWorkspaceRoot()
+	if err != nil {
+		pterm.Error.Println("Unable to determine workspace root: ", err)
+		return nil
+	}
+	result := make([]string, len(dependencies))
+	for i, dep := range dependencies {
+		result[i] = path.Join(root, dep)
+	}
+	return result
 }
 
 func bazelQuery(filter string) (string, error) {
@@ -155,7 +174,8 @@ func bazelJavaProtos() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return aQueryResult.Dependencies()
+	dependencies, err := aQueryResult.Dependencies()
+	return addWorkspaceRoot(dependencies), err
 }
 
 func bazelJavaDeps() ([]string, error) {
@@ -163,7 +183,8 @@ func bazelJavaDeps() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return aQueryResult.Dependencies()
+	dependencies, err := aQueryResult.Dependencies()
+	return addWorkspaceRoot(dependencies), err
 }
 
 func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (AQueryResult, error) {

@@ -12,5 +12,6 @@ func Generate() error {
 		return err
 	}
 	pterm.Info.Println("Running " + adaptor.Identifier())
-	return adaptor.Run()
+	_, _, error := adaptor.Generate()
+	return error
 }

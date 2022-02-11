@@ -3,12 +3,13 @@ package adaptor
 import (
 	"errors"
 	"internal/adaptor/bazel"
+	"internal/eclipse"
 )
 
 type Adaptor interface {
 	Identifier() string
 	Applicable() (bool, error)
-	Run() error
+	Generate() (*eclipse.Project, *eclipse.Classpath, error)
 }
 
 var Adaptors = []Adaptor{
