@@ -95,16 +95,12 @@ func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	if ss.err != nil {
 		return nil, nil, ss.err
 	}
-	srcDirs, tstDirs, err := bazelJavaDirs()
+	dirs, err := bazelJavaDirs()
 	if err != nil {
 		return nil, nil, err
 	}
 	fmt.Println("---Source---")
-	for _, dep := range srcDirs {
-		fmt.Println(dep)
-	}
-	fmt.Println("---Test---")
-	for _, dep := range tstDirs {
+	for _, dep := range dirs {
 		fmt.Println(dep)
 	}
 	return &eclipse.Project{}, &eclipse.Classpath{}, nil
@@ -197,23 +193,14 @@ func bazelJavaDeps() ([]string, error) {
 	return addWorkspaceRoot(dependencies), err
 }
 
-func bazelJavaDirs() ([]string, []string, error) {
+func bazelJavaDirs() ([]string, error) {
 	root, err := findBuildRoot()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	pterm.Info.Printf("Normalizing all java files in %s. This may take awhile...\n", root)
 	javaFiles := find(root, ".java")
-	var srcDirs []string
-	var tstDirs []string
-	for _, dir := range normalizeDirs(javaFiles) {
-		if isSrcDirectory(dir) {
-			srcDirs = append(srcDirs, dir)
-		} else {
-			tstDirs = append(tstDirs, dir)
-		}
-	}
-	return srcDirs, tstDirs, nil
+	return normalizeDirs(javaFiles), nil
 }
 
 // Use heuristics to determine whether source or test directory
@@ -264,11 +251,14 @@ func normalizeDirs(javaFiles []string) []string {
 	for _, file := range javaFiles {
 		dir := filepath.Dir(file)
 		pkg := extractPackage(file)
-		dirs.Insert(strings.TrimPrefix(strings.TrimSuffix(dir, pkg), buildRoot))
+		normalized := strings.TrimPrefix(strings.TrimSuffix(dir, pkg), buildRoot+string(os.PathSeparator))
+		dirs.Insert(normalized)
 	}
 	var res []string
 	for iter := dirs.Begin(); iter.IsValid(); iter.Next() {
-		res = append(res, fmt.Sprintf("%v", iter.Value()))
+		normalized := fmt.Sprintf("%v", iter.Value())
+		pterm.Info.Println("found: " + normalized)
+		res = append(res, normalized)
 	}
 	return res
 }
@@ -335,7 +325,11 @@ type CommandExec struct {
 }
 
 func (options CommandExec) runCommand(args ...string) (*bytes.Buffer, error) {
-	pterm.Info.Printf("%s\n", strings.Join(args, " "))
+	var argString = strings.Join(args, " ")
+	var delimiter = strings.Repeat("-", intMin(len(argString), 175))
+	pterm.Info.Println(delimiter)
+	pterm.Info.Printf("%s\n", argString)
+	pterm.Info.Println(delimiter)
 	var cmd = exec.Command(args[0], args[1:]...)
 	var buffer = &bytes.Buffer{}
 
@@ -351,6 +345,13 @@ func (options CommandExec) runCommand(args ...string) (*bytes.Buffer, error) {
 		return nil, err
 	}
 	return buffer, nil
+}
+
+func intMin(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func splitLines(input string) []string {

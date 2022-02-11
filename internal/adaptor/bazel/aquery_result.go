@@ -8,6 +8,7 @@ import (
 	"third_party/bazel/analysis_v2"
 
 	"github.com/liyue201/gostl/ds/set"
+	"github.com/pterm/pterm"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -65,7 +66,7 @@ func (analysis *AnalysisV2) Dependencies() ([]string, error) {
 				// pterm.Warning.Println("...artifact is the output of another java action: '" + strconv.Itoa(int(artifact.Id)) + "'")
 				continue
 			}
-			fmt.Printf("INFO: found dependency: %s\n", relative)
+			pterm.Info.Printf("found: %s\n", relative)
 			artifactPaths = append(artifactPaths, relative)
 		}
 	}
@@ -129,7 +130,7 @@ func (analysis *Analysis) Dependencies() ([]string, error) {
 				// pterm.Warning.Println("...artifact is the output of another java action: '" + artifact.Id + "'")
 				continue
 			}
-			fmt.Printf("INFO: found dependency: %s\n", relative)
+			pterm.Info.Printf("found: %s\n", relative)
 			artifactPaths = append(artifactPaths, relative)
 		}
 	}
