@@ -2,6 +2,7 @@ package bea
 
 import (
 	"internal/adaptor"
+	"internal/util"
 
 	"github.com/pterm/pterm"
 )
@@ -12,6 +13,14 @@ func Generate() error {
 		return err
 	}
 	pterm.Info.Println("Running " + adaptor.Identifier())
-	_, _, error := adaptor.Generate()
+	project, classpath, error := adaptor.Generate()
+	projectErr := util.WriteXml(".project", project)
+	if projectErr != nil {
+		return projectErr
+	}
+	classpathErr := util.WriteXml(".classpath", classpath)
+	if classpathErr != nil {
+		return classpathErr
+	}
 	return error
 }

@@ -3,7 +3,6 @@ package bazel
 import (
 	"bufio"
 	"bytes"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"internal/eclipse"
@@ -30,7 +29,7 @@ const WORKSPACE_MARKER = "WORKSPACE"
 
 var bazelVersion *Version
 
-func init() {
+func initVersion() {
 	output, err := CommandExec{Suppress: true}.runCommand("bazel", "--version")
 	if err != nil {
 		pterm.Fatal.Println(err)
@@ -79,42 +78,20 @@ func (ba *Adaptor) Identifier() string {
 }
 
 func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
-	fmt.Print(xml.Header)
-	out, _ := xml.MarshalIndent(&eclipse.Classpath{
-		Entries: []*eclipse.ClasspathEntry{
-			&eclipse.DefaultConEntry,
-			{},
-			{},
-		},
-	}, "", "    ")
-	fmt.Println(string(out))
-	fmt.Println("--------------")
-	out2, _ := xml.MarshalIndent(&eclipse.Project{
-		Name: "projectxyz",
-		BuildSpec: []*eclipse.BuildCommand{
-			{Name: "org.eclipse.jdt.core.javabuilder"},
-		},
-		Natures: []string{
-			"org.eclipse.jdt.core.javanature",
-		},
-	}, "", "    ")
-	fmt.Println(string(out2))
-	fmt.Println(findWorkspaceRoot())
-	var ss StringSlice
-	ss.append(bazelJavaProtos())
-	ss.append(bazelJavaDeps())
-	if ss.err != nil {
-		return nil, nil, ss.err
+	initVersion()
+	var jarDirs StringSlice
+	jarDirs.append(bazelJavaProtos())
+	jarDirs.append(bazelJavaDeps())
+	if jarDirs.err != nil {
+		return nil, nil, jarDirs.err
 	}
-	dirs, err := bazelJavaDirs()
+	srcDirs, tstDirs, err := bazelJavaDirs()
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Println("---Source---")
-	for _, dep := range dirs {
-		fmt.Println(dep)
-	}
-	return &eclipse.Project{}, &eclipse.Classpath{}, nil
+	return eclipse.GenerateProject(projectName()),
+		eclipse.GenerateClasspath(&eclipse.ClasspathOptions{SrcDirs: srcDirs, TstDirs: tstDirs, JarDirs: jarDirs.slice}),
+		nil
 }
 
 type StringSlice struct {
@@ -144,6 +121,15 @@ func findBuildRoot() (string, error) {
 		return "", err
 	}
 	return path.Dir(p), nil
+}
+
+func projectName() string {
+	dir, err := findBuildRoot()
+	if err != nil {
+		pterm.Error.Printf("Unable to get build root. Defaulting to unknown project name: %s\n", err)
+		return "unknown-project"
+	}
+	return filepath.Base(dir)
 }
 
 func dirHas(marker string) (bool, error) {
@@ -204,14 +190,23 @@ func bazelJavaDeps() ([]string, error) {
 	return addWorkspaceRoot(dependencies), err
 }
 
-func bazelJavaDirs() ([]string, error) {
+func bazelJavaDirs() ([]string, []string, error) {
 	root, err := findBuildRoot()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	pterm.Info.Printf("Normalizing all java files in %s. This may take awhile...\n", root)
 	javaFiles := find(root, ".java")
-	return normalizeDirs(javaFiles), nil
+	var srcDirs []string
+	var tstDirs []string
+	for _, dir := range normalizeDirs(javaFiles) {
+		if isSrcDirectory(dir) {
+			srcDirs = append(srcDirs, dir)
+		} else {
+			tstDirs = append(tstDirs, dir)
+		}
+	}
+	return srcDirs, tstDirs, nil
 }
 
 // Use heuristics to determine whether source or test directory
