@@ -14,6 +14,9 @@ func Generate() error {
 	}
 	pterm.Info.Println("Running " + adaptor.Identifier())
 	project, classpath, error := adaptor.Generate()
+	if error != nil {
+		return error
+	}
 	projectErr := util.WriteXml(".project", project)
 	if projectErr != nil {
 		return projectErr
@@ -22,5 +25,5 @@ func Generate() error {
 	if classpathErr != nil {
 		return classpathErr
 	}
-	return error
+	return nil
 }

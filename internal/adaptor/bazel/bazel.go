@@ -21,7 +21,7 @@ import (
 	"github.com/liyue201/gostl/ds/set"
 	"github.com/ojizero/gofindup"
 	"github.com/pterm/pterm"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const BUILD_MARKER = "BUILD"
@@ -50,7 +50,11 @@ func (version *Version) useV2() bool {
 		pterm.Warning.Println("Version not found. Defaulting to V2")
 		return true
 	}
-	return version.numeric[0] >= 5 // Just need to check the major version.
+	// NOTE: It *used* to be that running bazel in ~/Development/java would output
+	//       V1 proto but it seems to always produce V2 now. I'm not sure why it
+	//       suddenly changes, but fixing the code to always use V2.
+	return true
+	// return version.numeric[0] >= 3 // Just need to check the major version.
 }
 
 func parseVersion(raw string) (*Version, error) {
@@ -79,18 +83,24 @@ func (ba *Adaptor) Identifier() string {
 
 func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	initVersion()
-	var jarDirs StringSlice
-	jarDirs.append(bazelJavaProtos())
-	jarDirs.append(bazelJavaDeps())
-	if jarDirs.err != nil {
-		return nil, nil, jarDirs.err
+	var jarDirs = make([]string, 0)
+	var err error
+	var result []string
+	result, err = bazelJavaProtos()
+	if err != nil {
+		return nil, nil, err
+	}
+	jarDirs = append(jarDirs, result...)
+	result, err = bazelJavaDeps()
+	if err != nil {
+		return nil, nil, err
 	}
 	srcDirs, tstDirs, err := bazelJavaDirs()
 	if err != nil {
 		return nil, nil, err
 	}
 	return eclipse.GenerateProject(projectName()),
-		eclipse.GenerateClasspath(&eclipse.ClasspathOptions{SrcDirs: srcDirs, TstDirs: tstDirs, JarDirs: jarDirs.slice}),
+		eclipse.GenerateClasspath(&eclipse.ClasspathOptions{SrcDirs: srcDirs, TstDirs: tstDirs, JarDirs: jarDirs}),
 		nil
 }
 
@@ -100,6 +110,9 @@ type StringSlice struct {
 }
 
 func (ss *StringSlice) append(slice []string, err error) *StringSlice {
+	if err != nil {
+		ss.err = err
+	}
 	if ss.err != nil {
 		return ss
 	}
@@ -296,7 +309,7 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (AQueryRe
 	output, err := CommandExec{Suppress: true}.runCommand(
 		"bazel",
 		"aquery",
-		"--output=proto",
+		"--output=jsonproto",
 		"--include_aspects",
 		"--allow_analysis_failures",
 		"mnemonic("+mnemonic+", "+strings.Join(kindUnion, " union ")+")",
@@ -309,7 +322,7 @@ func bazelProtoAQuery(mnemonic string, filter string, kinds ...string) (AQueryRe
 
 func bazelParseProto(input *bytes.Buffer) (AQueryResult, error) {
 	aQuery := newAQueryResult()
-	err := proto.Unmarshal(input.Bytes(), aQuery.Result())
+	err := protojson.UnmarshalOptions{}.Unmarshal(input.Bytes(), aQuery.Result())
 	if err != nil {
 		pterm.Error.Println(err)
 		return nil, err
@@ -338,7 +351,6 @@ func (options CommandExec) runCommand(args ...string) (*bytes.Buffer, error) {
 	pterm.Info.Println(delimiter)
 	var cmd = exec.Command(args[0], args[1:]...)
 	var buffer = &bytes.Buffer{}
-
 	if options.Suppress {
 		cmd.Stdout = buffer
 	} else {
