@@ -95,6 +95,7 @@ func (ba *Adaptor) Generate() (*eclipse.Project, *eclipse.Classpath, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	jarDirs = append(jarDirs, result...)
 	srcDirs, tstDirs, err := bazelJavaDirs()
 	if err != nil {
 		return nil, nil, err
